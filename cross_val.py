@@ -49,7 +49,7 @@ def prepare_val_data(graphs, args, val_idx, max_nodes=0):
 
 # modified by niefan
 def prepare_val_data2(Hlist,New_G, args, val_idx, max_nodes=0):
-
+    random.seed(4)#todo
     random.shuffle(Hlist)
     val_size = len(Hlist) // 10  #related to train.py 538th row
     train_graphs = Hlist[:val_idx * val_size]
@@ -86,3 +86,28 @@ def prepare_val_data2(Hlist,New_G, args, val_idx, max_nodes=0):
 
     return train_dataset_loader, val_dataset_loader, \
             dataset_sampler.max_num_nodes, dataset_sampler.feat_dim, dataset_sampler.assign_feat_dim
+
+def prepare_val_data3(Hlist,New_G, args,  max_nodes=0):
+    random.seed(4)#todo
+    # random.shuffle(Hlist)
+    test_size=len(Hlist)
+    test_graphs=Hlist[:120]#todo
+    print('Num test graphs: ', len(test_graphs))
+    print('Number of graphs: ', len(Hlist))
+    print('Number of edges: ', New_G.number_of_edges()*len(Hlist))
+    # print('Max, avg, std of graph size: ',
+    #         max([G.number_of_nodes() for G in graphs]), ', '
+    #         "{0:.2f}".format(np.mean([G.number_of_nodes() for G in graphs])), ', '
+    #         "{0:.2f}".format(np.std([G.number_of_nodes() for G in graphs])))
+
+    # minibatch
+
+    dataset_sampler = GraphSampler2(test_graphs, New_G,normalize=False, max_num_nodes=max_nodes,
+            features=args.feature_type)
+    test_dataset_loader = torch.utils.data.DataLoader(
+            dataset_sampler,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers)
+
+    return test_dataset_loader ,dataset_sampler.max_num_nodes, dataset_sampler.feat_dim, dataset_sampler.assign_feat_dim

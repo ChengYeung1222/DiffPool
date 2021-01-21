@@ -49,6 +49,8 @@ import load_data
 # 作者自己写的模块函数
 import util
 
+# seed=4#0-20000
+
 
 # evaluate该函数最后输出一个类似于“acc：...”的结果
 def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
@@ -78,6 +80,8 @@ def evaluate(dataset, model, args, name='Validation', max_num_examples=None):
     # np.hstack():在水平方向上平铺
     labels = np.hstack(labels)
     preds = np.hstack(preds)
+
+
     scores=np.concatenate(scores,axis=0)
 
     fpr, tpr, thresholds = metrics.roc_curve(labels, preds, pos_label=1)  # nf
@@ -236,6 +240,10 @@ def train(dataset, model, args, same_feat=True, val_dataset=None, test_dataset=N
     test_accs = []
     test_epochs = []
     val_accs = []
+    #242-244 set data store dir
+    ckpt_path='./ckpt/zp_batchsiez=80/'#todo
+    if not os.path.isdir(ckpt_path):
+        os.mkdir(ckpt_path)
     for epoch in range(args.num_epochs):
         total_time = 0
         avg_loss = 0.0
@@ -315,6 +323,11 @@ def train(dataset, model, args, same_feat=True, val_dataset=None, test_dataset=N
             print('Test result: ', test_result)
             test_epochs.append(test_result['epoch'])
             test_accs.append(test_result['acc'])
+        #325-327 save checkpoints
+        ckpt_name = os.path.join(ckpt_path, 'model_epoch' + str(epoch) + '.pth')#todo
+        print('Save model: {}'.format(ckpt_name))
+        torch.save(obj=model.state_dict(), f=ckpt_name)
+
 
     matplotlib.style.use('seaborn')
     plt.switch_backend('agg')
@@ -616,33 +629,61 @@ def benchmark_task_val(args, writer=None, feat='node-feat'):
             featgen_const.gen_node_features(G)
 
     # related to cross_val.py 13d row
-    for i in range(10):
-        # train_dataset, val_dataset, max_num_nodes, input_dim, assign_input_dim = \
-        #     cross_val.prepare_val_data(graphs, args, i, max_nodes=args.max_nodes)
-        train_dataset, val_dataset, max_num_nodes, input_dim, assign_input_dim = \
-            cross_val.prepare_val_data2(Hlist,New_G, args, i, max_nodes=args.max_nodes)
-        if args.method == 'soft-assign':
-            print('Method: soft-assign')
-            model = encoders.SoftPoolingGcnEncoder(
-                max_num_nodes,
-                input_dim, args.hidden_dim, args.output_dim, args.num_classes, args.num_gc_layers,
-                args.hidden_dim, assign_ratio=args.assign_ratio, num_pooling=args.num_pool,
-                bn=args.bn, dropout=args.dropout, linkpred=args.linkpred, args=args,
-                assign_input_dim=assign_input_dim).cuda()
-        elif args.method == 'base-set2set':
-            print('Method: base-set2set')
-            model = encoders.GcnSet2SetEncoder(
-                input_dim, args.hidden_dim, args.output_dim, args.num_classes,
-                args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
-        else:
-            print('Method: base')
-            model = encoders.GcnEncoderGraph(
-                input_dim, args.hidden_dim, args.output_dim, args.num_classes,
-                args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
+    #cross validation
+    # for i in range(10):
+    #     # train_dataset, val_dataset, max_num_nodes, input_dim, assign_input_dim = \
+    #     #     cross_val.prepare_val_data(graphs, args, i, max_nodes=args.max_nodes)
+    #     train_dataset, val_dataset, max_num_nodes, input_dim, assign_input_dim = \
+    #         cross_val.prepare_val_data2(Hlist,New_G, args, i, max_nodes=args.max_nodes)
+    #     if args.method == 'soft-assign':
+    #         print('Method: soft-assign')
+    #         model = encoders.SoftPoolingGcnEncoder(
+    #             max_num_nodes,
+    #             input_dim, args.hidden_dim, args.output_dim, args.num_classes, args.num_gc_layers,
+    #             args.hidden_dim, assign_ratio=args.assign_ratio, num_pooling=args.num_pool,
+    #             bn=args.bn, dropout=args.dropout, linkpred=args.linkpred, args=args,
+    #             assign_input_dim=assign_input_dim).cuda()
+    #     elif args.method == 'base-set2set':
+    #         print('Method: base-set2set')
+    #         model = encoders.GcnSet2SetEncoder(
+    #             input_dim, args.hidden_dim, args.output_dim, args.num_classes,
+    #             args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
+    #     else:
+    #         print('Method: base')
+    #         model = encoders.GcnEncoderGraph(
+    #             input_dim, args.hidden_dim, args.output_dim, args.num_classes,
+    #             args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
+    #
+    #     _, val_accs = train(train_dataset, model, args, val_dataset=val_dataset, test_dataset=None,
+    #                         writer=writer)
+    #     all_vals.append(np.array(val_accs))
 
-        _, val_accs = train(train_dataset, model, args, val_dataset=val_dataset, test_dataset=None,
-                            writer=writer)
-        all_vals.append(np.array(val_accs))
+
+
+    train_dataset, val_dataset, max_num_nodes, input_dim, assign_input_dim = \
+        cross_val.prepare_val_data2(Hlist, New_G, args, i, max_nodes=args.max_nodes)
+    if args.method == 'soft-assign':
+        print('Method: soft-assign')
+        model = encoders.SoftPoolingGcnEncoder(
+            max_num_nodes,
+            input_dim, args.hidden_dim, args.output_dim, args.num_classes, args.num_gc_layers,
+            args.hidden_dim, assign_ratio=args.assign_ratio, num_pooling=args.num_pool,
+            bn=args.bn, dropout=args.dropout, linkpred=args.linkpred, args=args,
+            assign_input_dim=assign_input_dim).cuda()
+    elif args.method == 'base-set2set':
+        print('Method: base-set2set')
+        model = encoders.GcnSet2SetEncoder(
+            input_dim, args.hidden_dim, args.output_dim, args.num_classes,
+            args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
+    else:
+        print('Method: base')
+        model = encoders.GcnEncoderGraph(
+            input_dim, args.hidden_dim, args.output_dim, args.num_classes,
+            args.num_gc_layers, bn=args.bn, dropout=args.dropout, args=args).cuda()
+
+    _, val_accs = train(train_dataset, model, args, val_dataset=val_dataset, test_dataset=None,
+                        writer=writer)
+    all_vals.append(np.array(val_accs))
     all_vals = np.vstack(all_vals)
     all_vals = np.mean(all_vals, axis=0)
     print(all_vals)
@@ -710,15 +751,16 @@ def arg_parse():
                         const=False, default=True,
                         help='Whether to add bias. Default to True.')
     parser.add_argument('--no-log-graph', dest='log_graph', action='store_const',
-                        const=False, default=True,
+                        const=False, default=False,#default can be False or Ture#todo
                         help='Whether disable log graph')
 
     parser.add_argument('--method', dest='method',
                         help='Method. Possible values: base, base-set2set, soft-assign')
     parser.add_argument('--name-suffix', dest='name_suffix',
                         help='suffix added to the output filename')
-
-    parser.set_defaults(bmname='',
+    parser.add_argument('--seed', dest='seed',
+                        help='random seed')
+    parser.set_defaults(bmname='ZP1',
 
                         datadir='data',
                         logdir='log',
@@ -726,10 +768,10 @@ def arg_parse():
                         max_nodes=2592,
                         cuda='0',
                         feature_type='default',
-                        lr=0.001,
+                        lr=0.01,
                         clip=2.0,
-                        batch_size=20,
-                        num_epochs=300,
+                        batch_size=40,
+                        num_epochs=1000,
                         train_ratio=0.8,
                         test_ratio=0.1,
                         num_workers=6,
@@ -742,7 +784,8 @@ def arg_parse():
                         method='soft-assign',
                         name_suffix='',
                         assign_ratio=0.1,
-                        num_pool=1
+                        num_pool=1,
+                        seed=4
                         )
     return parser.parse_args()
 
@@ -760,7 +803,10 @@ def main():
 
     os.environ['CUDA_VISIBLE_DEVICES'] = prog_args.cuda
     print('CUDA', prog_args.cuda)
-
+    #776-777 set random seed#todo
+    torch.manual_seed(prog_args.seed)
+    torch.cuda.manual_seed(prog_args.seed)
+    print('seed',prog_args.seed)
     if prog_args.bmname is not None:
         benchmark_task_val(prog_args, writer=writer)
     elif prog_args.pkl_fname is not None:
